@@ -3,6 +3,12 @@
 
 /* a test of the lightweight thread implementation in alib_go */
 
+/** Quick documentation:
+ * Call alib_thread_init() before doing anything,
+ * alib_go() to start a lightweight thread,
+ * and alib_thread_end() when you're finished.
+ */
+ 
 #include <stdio.h>
 #include "ago.h"
 
