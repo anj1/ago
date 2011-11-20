@@ -1,3 +1,5 @@
+This is a thread pool implementation. There is no penalty to launching additional jobs, and you can have many more jobs than the OS is comfortable with.
+
 For a quick example on how to use this, see ago_test.c.
 
 I am aware that there are multiple implementations out there that try to do this. Mine is different, however:
