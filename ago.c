@@ -81,10 +81,7 @@ pthread_cond_t idle_condition;
 /** Idling function.
  * Designed to block (not do anything) until a function has been
  * assigned to it.
- * The way this works is that we have a mutex for each thread.
- * alib_thread_init createx these mutexes and alib_go releases one.
- * Every thread is passed its own mutex.
- */
+ * See description at top of file. */
 void *thread_idle(void *a)
 {
 	void (*func)(void*);
