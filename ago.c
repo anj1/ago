@@ -184,11 +184,17 @@ int alib_thread_wait()
 {
 	while(1){
 		pthread_mutex_lock(&nrunning_mutex);
-		pthread_cond_wait(&idle_condition,&nrunning_mutex);
+		/* any jobs running? If so, wait until they are idle */
+		if(nrunning>0)
+			pthread_cond_wait(&idle_condition,&nrunning_mutex);
+			
+		/* check to make sure wake-up wasn't spurious */
 		if(nrunning==0){
 			pthread_mutex_unlock(&nrunning_mutex);
 			return 0;
 		}
+		
+		/* spurious wake-up. Wait again. */
 		pthread_mutex_unlock(&nrunning_mutex);
 #ifndef NO_UNISTD
 		usleep(10);
