@@ -189,6 +189,7 @@ int alib_thread_wait()
 			pthread_mutex_unlock(&nrunning_mutex);
 			return 0;
 		}
+		pthread_mutex_unlock(&nrunning_mutex);
 #ifndef NO_UNISTD
 		usleep(10);
 #endif
