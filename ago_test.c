@@ -21,7 +21,7 @@ int main()
 {
 	int i;
 	int r;
-	int a[256];
+	int a[2048];
 	
 	/* the number of threads should generally be set to the number of
 	 * cores in the machine. It's set to 4 here for simplicity */
@@ -31,7 +31,7 @@ int main()
 	}
 	
 	/* make lots of functions in parallel! */
-	for(i=0;i<256;i++){
+	for(i=0;i<2048;i++){
 		a[i]=i;
 		if((r=alib_go(&worker,a+i))) fprintf(stderr,"ERROR:alib_go:%d\n",r);
 	}
@@ -39,5 +39,7 @@ int main()
 	if((r=alib_thread_wait()))fprintf(stderr,"ERROR:alib_thread_wait\n");
 	if((r=alib_thread_end())) fprintf(stderr,"ERROR:alib_thread_end\n");
 
+	printf("after wait.\n");
+	
 	return 0;
 }

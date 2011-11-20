@@ -13,3 +13,24 @@ I am aware that there are multiple implementations out there that try to do this
 - I took great care for there to be no race conditions or deadlocks, but with multithreading you never really know. Please tell me about any bugs you find.
 
 By the way, the reason there's an alib_ before everything is that this was originally part of my own custom C extension library, Alib. I might release the full library in the future.
+
+FAQ
+
+Q. I found a bug in your program?
+
+A. My email address is my username (at gmail.com).
+
+Q. Why did you write this? What use is it?
+
+A. Mainly for fun. Of course, I use it all the time in my own little projects, and you are more than welcome to.
+
+Q. What's with all the synchronization? Can't you make it so that less primitives are needed?
+
+A. Even experienced programmers sometimes underestimate the number of synchronization primitives required to implement even the most basic multithreaded apps. This invariably results in lots of grief when the program has erratic bugs and deadlocks that are hard to isolate and debug. The code is designed so that the mutexes are usually free before they are expected to be used. I've tested it extensively.
+
+There might be a way to cut down on the number of synchronization primitives in the code. However, it would almost surely increase the code complexity, add more global variables, and not have any measurable effect on speed. As it currently stands, the code is incredibly fast, with alib_go() being virtually instantaneous even in the worst-case scenario.
+
+Q. Why use global variables? Why is there only one thread pool?
+
+A. Encapsulating threads in a struct or class would complicate the code and make little sense if you think about it. Threads are a global resource (just like I/O) and the ability to hide them from view would be dangerous. Few programming languages that implement lightweight threads offer more than one thread pool.
+

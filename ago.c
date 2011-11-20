@@ -47,6 +47,7 @@
 
 #include <pthread.h>
 #include <semaphore.h>
+#include <malloc.h>	/* realloc() */
 #ifndef NO_UNISTD
 #include <unistd.h>	/* usleep() */
 #endif
@@ -55,8 +56,8 @@
    Can obviously be changed later on. */
 #define MAX_THREADS 1024
 
-/* maximum number of functions. Can be changed. */
-#define MAX_FUNCS 65536
+/* maximum number of functions. Can be changed dynamically. */
+int maxfuncs=0;
 
 /* number of currently-running threads */
 int nthreads=0;
@@ -72,8 +73,8 @@ int free_thread[MAX_THREADS];
 int nfree_thread=0;
 
 /* queue of function pointers and associated data */
-void (*func_list[MAX_FUNCS])(void*);
-void *arg_list[MAX_FUNCS];
+void (**func_list)(void*)=NULL;
+void **arg_list=NULL;
 pthread_mutex_t func_mutex;
 int qstart=0;
 int qend=0;
@@ -85,6 +86,39 @@ sem_t sem;
 int nrunning=0;
 pthread_mutex_t nrunning_mutex;
 pthread_cond_t idle_condition;
+
+/* when the number of functions in the function queue is exceeded,
+ * or at the beginning of the threading library,
+ * this is called. */
+static int expand_funcqueue(int newsize)
+{
+	int oldmaxfuncs,bump;
+	int i;
+	
+	/* expand the function queue */
+	oldmaxfuncs = maxfuncs;
+	maxfuncs = newsize;
+	
+	/* relocate it */
+	func_list = realloc(func_list, sizeof(void (*)(void *))*maxfuncs);
+	if(!func_list) return 1;
+	
+	arg_list  = realloc(arg_list, sizeof(void *)*maxfuncs);
+	if(!arg_list) {free(func_list); func_list=NULL; return 2;}
+	
+	/* copy the tail of the old queue, if any, to the tail of the new */
+	if(qstart > qend){
+		bump = maxfuncs - oldmaxfuncs;
+		//memcpy(func_list + qstart + bump, func_list + qstart, (oldmaxfuncs - qstart)*sizeof(void (*)void));
+		for(i=qstart;i<oldmaxfuncs;i++){
+			func_list[i+bump] = func_list[i];
+			arg_list [i+bump] = arg_list [i];
+		}
+		qstart += bump;
+	}
+	
+	return 0;
+}
 
 /** Idling function.
  * Designed to block (not do anything) until a function has been
@@ -111,7 +145,7 @@ void *thread_idle(void *a)
 		func = func_list[qstart];	/* get details from start of queue*/
 		arg  = arg_list [qstart];	
 		qstart++;
-		if(qstart >= MAX_FUNCS) qstart=0;
+		if(qstart >= maxfuncs) qstart=0;
 		pthread_mutex_unlock(&func_mutex);
 		
 		/* now run the function */
@@ -157,6 +191,9 @@ int alib_thread_init(int max_conc)
 	if(pthread_mutex_init(&nrunning_mutex,NULL)) return -4;
 	if(pthread_cond_init(&idle_condition,NULL)) return -5;
 	
+	/* allocate memory for function queue */
+	if(expand_funcqueue(1024)) return -7;
+	
 	for(i=0;i<max_conc;i++){
 		/* Create the idler threads */
 		if(pthread_create(thread_list+i,NULL,&thread_idle,NULL))
@@ -169,7 +206,7 @@ int alib_thread_init(int max_conc)
 	/* wait until all threads are in idling state, ready to be run. */
 	/* TODO: I don't know if this code even works or not */
 	while(1){
-		if(sem_getvalue(&sem,&sval)) return -7;
+		if(sem_getvalue(&sem,&sval)) return -8;
 		if(sval<=0) break;
 #ifndef NO_UNISTD
 		usleep(10);
@@ -229,7 +266,13 @@ int alib_thread_end()
 	nrunning=0;
 	if(sem_destroy(&sem)) return 3;
 	if(pthread_mutex_destroy(&nrunning_mutex)) return 4;
-	if(pthread_cond_destroy(&idle_condition)) return 5;
+	if(pthread_mutex_destroy(&func_mutex)) return 5;
+	if(pthread_cond_destroy(&idle_condition)) return 6;
+	free(func_list); func_list=NULL;
+	free(arg_list);  arg_list =NULL;
+	maxfuncs=0;
+	qend=0;
+	qstart=0;
 	
 	return 0;
 }
@@ -243,16 +286,18 @@ int alib_go(void (*func)(void *), void *arg)
 	/* have we been initialized? */
 	if(!nthreads) return 1;
 	
-	/* too many waiting functions? */
-	if(((qend+1)%MAX_FUNCS)==qstart) return 2;
-	
 	/* add function to queue */
 	pthread_mutex_lock(&func_mutex);
+	
+	/* too many waiting functions? */
+	if(((qend+1)%maxfuncs)==qstart){
+		if(expand_funcqueue(maxfuncs*2)) return 2;
+	}
+	
 	func_list[qend] = func;
-	arg_list[qend]  = arg;
+	arg_list [qend] = arg;
 	qend++;
-	if(qend >= MAX_FUNCS) qend=0;
-	if(qend == qstart) return 3;
+	if(qend >= maxfuncs) qend=0;
 	pthread_mutex_unlock(&func_mutex);
 	
 	/* from this point on, the function is considered to be 'running',
@@ -265,7 +310,7 @@ int alib_go(void (*func)(void *), void *arg)
 	pthread_mutex_unlock(&nrunning_mutex);
 		
 	/* now allow one thread to be released and run it */
-	if(sem_post(&sem)) return 4;
+	if(sem_post(&sem)) return 3;
 	
 	return 0;
 }
