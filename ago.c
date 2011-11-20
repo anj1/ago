@@ -1,4 +1,4 @@
-/* lightweight goroutine-like threads for C */
+/* lightweight thread pool for C */
 /* by Alireza Nejati */
 
 /* This program is free software; you can redistribute it and/or modify
