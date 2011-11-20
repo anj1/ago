@@ -41,7 +41,10 @@
  * dispatched, and (again, atomically) whenever the function completes.
  * Thus, when it becomes 0 we are guaranteed that all threads are idle
  * and no functions are in the pipeline, waiting to be executed. */
- 
+
+/* TODO: make function list a queue, not a stack */
+/* TODO: make alib_thread_init wait for *all* threads, not just one */
+
 #include <pthread.h>
 #include <semaphore.h>
 #include <unistd.h>	/* usleep() */
@@ -49,6 +52,9 @@
 /* absolute maximum number of threads, ever.
    Can obviously be changed later on. */
 #define MAX_THREADS 1024
+
+/* maximum number of functions. Can be changed. */
+#define MAX_FUNCS 65536
 
 /* number of currently-running threads */
 int nthreads=0;
@@ -63,12 +69,12 @@ pthread_t thread_list[MAX_THREADS];
 int free_thread[MAX_THREADS];
 int nfree_thread=0;
 
-/* stack of function pointers.
- * By having one for each thread, there is no danger */
-void (*func_list[MAX_THREADS])(void*);
-void *arg_list[MAX_THREADS];
+/* queue of function pointers and associated data */
+void (*func_list[MAX_FUNCS])(void*);
+void *arg_list[MAX_FUNCS];
 pthread_mutex_t func_mutex;
-int nfuncs=0;
+int qstart=0;
+int qend=0;
 
 /* our function list semaphore */
 sem_t sem;
@@ -100,9 +106,10 @@ void *thread_idle(void *a)
 		 * start to run the same function, if alib_go is called rapidly
 		 * in succession */
 		pthread_mutex_lock(&func_mutex);
-		nfuncs--;
-		func = func_list[nfuncs];
-		arg  = arg_list [nfuncs];
+		func = func_list[qstart];	/* get details from start of queue*/
+		arg  = arg_list [qstart];	
+		qstart++;
+		if(qstart >= MAX_FUNCS) qstart=0;
 		pthread_mutex_unlock(&func_mutex);
 		
 		/* now run the function */
@@ -220,13 +227,15 @@ int alib_go(void (*func)(void *), void *arg)
 	if(!nthreads) return 1;
 	
 	/* too many waiting functions? */
-	if(nfuncs==MAX_THREADS) return 2;
+	if(((qend+1)%MAX_FUNCS)==qstart) return 2;
 	
-	/* add function to stack */
+	/* add function to queue */
 	pthread_mutex_lock(&func_mutex);
-	func_list[nfuncs] = func;
-	arg_list[nfuncs]  = arg;
-	nfuncs++;
+	func_list[qend] = func;
+	arg_list[qend]  = arg;
+	qend++;
+	if(qend >= MAX_FUNCS) qend=0;
+	if(qend == qstart) return 3;
 	pthread_mutex_unlock(&func_mutex);
 	
 	/* from this point on, the function is considered to be 'running',
@@ -239,7 +248,7 @@ int alib_go(void (*func)(void *), void *arg)
 	pthread_mutex_unlock(&nrunning_mutex);
 		
 	/* now allow one thread to be released and run it */
-	if(sem_post(&sem)) return 3;
+	if(sem_post(&sem)) return 4;
 	
 	return 0;
 }
