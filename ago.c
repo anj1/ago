@@ -47,7 +47,9 @@
 
 #include <pthread.h>
 #include <semaphore.h>
+#ifndef NO_UNISTD
 #include <unistd.h>	/* usleep() */
+#endif
 
 /* absolute maximum number of threads, ever.
    Can obviously be changed later on. */
@@ -169,7 +171,9 @@ int alib_thread_init(int max_conc)
 	while(1){
 		if(sem_getvalue(&sem,&sval)) return -7;
 		if(sval<=0) break;
+#ifndef NO_UNISTD
 		usleep(10);
+#endif
 	}
 	
 	return 0;
@@ -178,11 +182,17 @@ int alib_thread_init(int max_conc)
 /* waits until all threads are idle */
 int alib_thread_wait()
 {
-	pthread_mutex_lock(&nrunning_mutex);
-	pthread_cond_wait(&idle_condition,&nrunning_mutex);
-	pthread_mutex_unlock(&nrunning_mutex);
-	
-	return 0;
+	while(1){
+		pthread_mutex_lock(&nrunning_mutex);
+		pthread_cond_wait(&idle_condition,&nrunning_mutex);
+		if(nrunning==0){
+			pthread_mutex_unlock(&nrunning_mutex);
+			return 0;
+		}
+#ifndef NO_UNISTD
+		usleep(10);
+#endif
+	}
 }
 
 /** Closes up all running threads.

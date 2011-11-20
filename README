@@ -8,8 +8,8 @@ I am aware that there are multiple implementations out there that try to do this
 
 - It's so lightweight you can (and should) directly include the source, without compiling a separate library.
 
-- It is all POSIX threads so it's portable. There are no busy-wait loops or anything. If you don't have unistd.h on your system, just comment it out and remove the usleep(). The only thing that *might* change is increased CPU usage.
+- It is all POSIX threads so it's portable. There are no busy-wait loops or anything. If you don't have unistd.h on your system, just define NO_UNISTD. It might end up using more cpu, though.
 
-- I took great care for there to be no race conditions, but with multithreading you never really know. Please tell me about any bugs you find.
+- I took great care for there to be no race conditions or deadlocks, but with multithreading you never really know. Please tell me about any bugs you find.
 
 By the way, the reason there's an alib_ before everything is that this was originally part of my own custom C extension library, Alib. I might release the full library in the future.
