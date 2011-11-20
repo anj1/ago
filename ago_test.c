@@ -19,25 +19,22 @@ void worker(void *a)
 
 int main()
 {
+	int i;
 	int r;
-	int a[4];
+	int a[256];
 	
+	/* the number of threads should generally be set to the number of
+	 * cores in the machine. It's set to 4 here for simplicity */
 	if((r=alib_thread_init(4))){
 		fprintf(stderr,"Error %d in alib_thread_init\n", r);
 		return r;
 	}
 	
-	a[0]=1;
-	if((r=alib_go(&worker,a+0))) fprintf(stderr,"ERROR:alib_go:%d\n",r);
-	
-	a[1]=2;
-	alib_go(&worker,a+1);
-	
-	a[2]=3;
-	alib_go(&worker,a+2);
-	
-	a[3]=4;
-	alib_go(&worker,a+3);
+	/* make lots of functions in parallel! */
+	for(i=0;i<256;i++){
+		a[i]=i;
+		if((r=alib_go(&worker,a+i))) fprintf(stderr,"ERROR:alib_go:%d\n",r);
+	}
 	
 	if((r=alib_thread_wait()))fprintf(stderr,"ERROR:alib_thread_wait\n");
 	if((r=alib_thread_end())) fprintf(stderr,"ERROR:alib_thread_end\n");
