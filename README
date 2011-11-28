@@ -34,3 +34,4 @@ Q. Why use global variables? Why is there only one thread pool?
 
 A. Encapsulating threads in a struct or class would complicate the code and make little sense if you think about it. Threads are a global resource (just like I/O) and the ability to hide them from view would be dangerous. Few programming languages that implement lightweight threads offer more than one thread pool.
 
+However, there might be some cases where this would be necessary. Andrew Gascoyne-Cecil has written a port of this repo to C++ that encapsulates the thread pool in a struct. See https://github.com/acecil/ago .
