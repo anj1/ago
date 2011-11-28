@@ -17,7 +17,7 @@
  * MA 02110-1301, USA. 
  */
 
-/**The way this is done is we have several idle threads that don't do
+/* The way this is done is we have several idle threads that don't do
  * anything until alib_go() is called. We have a semaphore that counts
  * how many *functions* there are waiting to be called, not how many
  * *threads* that are running idle. Each time alib_go() is called, the
@@ -42,7 +42,6 @@
  * Thus, when it becomes 0 we are guaranteed that all threads are idle
  * and no functions are in the pipeline, waiting to be executed. */
 
-/* TODO: make function list a queue, not a stack */
 /* TODO: make alib_thread_init wait for *all* threads, not just one */
 
 #include <pthread.h>
@@ -57,7 +56,8 @@
 #define MAX_THREADS 1024
 
 /* maximum number of functions. Can be changed dynamically. */
-int maxfuncs=0;
+/* is set in alib_thread_init() */
+int maxfuncs;
 
 /* number of currently-running threads */
 int nthreads=0;
@@ -76,8 +76,8 @@ int nfree_thread=0;
 void (**func_list)(void*)=NULL;
 void **arg_list=NULL;
 pthread_mutex_t func_mutex;
-int qstart=0;
-int qend=0;
+int qstart;
+int qend;
 
 /* our function list semaphore */
 sem_t sem;
@@ -193,6 +193,8 @@ int alib_thread_init(int max_conc)
 	
 	/* allocate memory for function queue */
 	if(expand_funcqueue(1024)) return -7;
+	qstart=0;
+	qend=0;
 	
 	for(i=0;i<max_conc;i++){
 		/* Create the idler threads */
@@ -271,8 +273,6 @@ int alib_thread_end()
 	free(func_list); func_list=NULL;
 	free(arg_list);  arg_list =NULL;
 	maxfuncs=0;
-	qend=0;
-	qstart=0;
 	
 	return 0;
 }
@@ -291,7 +291,11 @@ int alib_go(void (*func)(void *), void *arg)
 	
 	/* too many waiting functions? */
 	if(((qend+1)%maxfuncs)==qstart){
-		if(expand_funcqueue(maxfuncs*2)) return 2;
+		if(expand_funcqueue(maxfuncs*2)){
+			/* release mutex before exiting */
+			pthread_mutex_unlock(&func_mutex);
+			return 2;
+		}
 	}
 	
 	func_list[qend] = func;
